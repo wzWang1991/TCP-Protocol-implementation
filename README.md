@@ -1,4 +1,4 @@
-# Programming Assignment 2 --- TCP Protocol implementation based on UDP
+# Programming Assignment 2 --- Simple TCP-like transport-layer protocol
 
 	Weizhen Wang	ww2339
 -------------------------------------------------------------------------
