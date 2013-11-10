@@ -34,7 +34,7 @@ public class sender {
 		fileSender.setLogFile(logFileName);
 		
 		//Read content from file.
-		FileInputStream in;
+		FileInputStream in = null;
 		DataInputStream dis = null;
 		try {
 			in = new FileInputStream(fileName);  
@@ -56,6 +56,14 @@ public class sender {
 				System.arraycopy(packetDataBuf, 0, packetData, 0, readCounter);
 				fileSender.send(packetData);
 			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			//e.printStackTrace();
+		}
+		
+		try {
+			in.close();
+			dis.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			//e.printStackTrace();

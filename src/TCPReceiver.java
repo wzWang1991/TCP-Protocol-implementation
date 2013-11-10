@@ -9,12 +9,18 @@ import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Iterator;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
 
 
 
 public class TCPReceiver {
 	private final int MaxSegmentSize=576;
+	
+	//Delayed ACK. Wait up to 10 msec for arrival of another in-order segment. 
+	//If next in-order segment does not arrive in this interval, send an ACK.
+	private final int TCPACKDelayTime = 20;
 	
 	private String remoteIP;
 	private int remotePort;
@@ -37,6 +43,10 @@ public class TCPReceiver {
 	//Buffer for rcvPacket.
 	private volatile LinkedBlockingQueue<TCPPacket> rcvPacketQueue;
 	
+	private Timer ACKDelayTimer;
+	
+	private boolean delayACK;
+	
 	
 	
 	public TCPReceiver(String remoteIP, int remotePort, int listeningPort){
@@ -58,7 +68,9 @@ public class TCPReceiver {
 		this.endFlag=false;
 		
 		this.windowSize = 0;
-	
+		
+		this.ACKDelayTimer = new Timer();
+		this.delayACK = false;
 	}
 	
 	public byte[] receive(){
@@ -86,7 +98,9 @@ public class TCPReceiver {
 			
 			//Check the checksum.
 			if(!rcvPacket.analysePacket()){
-				writeLog("Received a packet with a wrong checksum from" +packet.getAddress().getHostAddress());
+				writeLog("Received a packet with a wrong checksum from " +packet.getAddress().getHostAddress()+".\n");
+				if(delayACK) cancelDelayACK();
+				sendAck(expectedSequenceNum);
 				continue;
 			}
 			
@@ -106,13 +120,17 @@ public class TCPReceiver {
 			
 			//Check the sequence number.
 			
-			//Sometimes ack losses, so it transmit a ack with expectedSequenceNum-1.
+			//Sometimes ack losses, so it transmit a ack with expectedSequenceNum.
 			if(rcvPacket.getSequenceNumber()<this.expectedSequenceNum){
-				sendAck(expectedSequenceNum-1);
+				if(delayACK) cancelDelayACK();
+				sendAck(expectedSequenceNum);
 				continue;
 			}
 			
 			if(rcvPacket.getSequenceNumber()>this.expectedSequenceNum && rcvPacket.getSequenceNumber()<this.expectedSequenceNum+this.windowSize){
+				//Cancel the delay ACK.
+				if(delayACK) cancelDelayACK();
+				
 				LinkedBlockingQueue<TCPPacket> tmpQueue = new LinkedBlockingQueue<TCPPacket>();
 				boolean insertedFlag =false;
 				if(!rcvPacketQueue.isEmpty()){
@@ -125,6 +143,7 @@ public class TCPReceiver {
 							if(!insertedFlag){
 								tmpQueue.add(rcvPacket);
 								tmpQueue.add(packetTmp);
+								insertedFlag = true;
 							}else{
 								tmpQueue.add(packetTmp);
 							}
@@ -134,25 +153,41 @@ public class TCPReceiver {
 						}
 					}
 				}
-				//If the packet is still not inserted.
+				//If the packet is still not inserted, insert it at the end of queue.
 				if(!insertedFlag){
 					tmpQueue.add(rcvPacket);
+					insertedFlag = true;
 				}
+				
 				rcvPacketQueue = tmpQueue;
 				sendAck(expectedSequenceNum-1);
 				continue;
 			}
 			
 			//If the sequence number of rcvPacket is larger than window border, just ignore.
-			if(rcvPacket.getSequenceNumber()>=this.expectedSequenceNum+this.windowSize) continue;
+			if(rcvPacket.getSequenceNumber()>=this.expectedSequenceNum+this.windowSize){
+				if(delayACK) cancelDelayACK();
+				continue;
+			}
 			
 			//If the sequence number equal to expected number.
-			if(rcvPacket.getSequenceNumber()==this.expectedSequenceNum){
+			if(rcvPacket.getSequenceNumber()==this.expectedSequenceNum){	
 				if(rcvPacketQueue.isEmpty()){
-					sendAck(expectedSequenceNum);
+					//We don't want to delay the FIN ack.
+					if(rcvPacket.getFIN()!=1){
+						if(!delayACK) setDelayACK();
+						else{
+							cancelDelayACK();
+							setDelayACK();
+						}
+					}else{
+						sendAck(expectedSequenceNum);
+					}
+					//else sendAck(expectedSequenceNum);
 					data = rcvPacket.getDataInByte();
 					expectedSequenceNum++;
 				}else{
+					if(delayACK) cancelDelayACK();
 					//Counter for how many bytes should be returned.
 					int ackCounter = rcvPacket.getDataInByte().length;
 					//Check for queue, find continuous numbers.
@@ -187,8 +222,8 @@ public class TCPReceiver {
 						System.arraycopy(packetInQueue.getDataInByte(), 0, data, dataPointer, packetInQueue.getDataInByte().length);
 						dataPointer+=packetInQueue.getDataInByte().length;
 					}
-					sendAck(reSeq);
 					expectedSequenceNum = reSeq + 1;
+					sendAck(expectedSequenceNum);
 				}
 			}
 			
@@ -227,7 +262,10 @@ public class TCPReceiver {
 	}
 	
 	private void sendAck(long ackNum){
-		TCPPacket ackPacket = new TCPPacket(listeningPort,remotePort,0,ackNum,"ACK",null, windowSize);
+		long newAckNum = 0;
+		if(ackNum<0) newAckNum = 0;
+		else newAckNum = ackNum;
+		TCPPacket ackPacket = new TCPPacket(listeningPort,remotePort,0,newAckNum,"ACK",null, windowSize);
 		writeLog("Src=localhost:"+ackPacket.getSourcePort()+", Des="+ackSocket.getInetAddress().getHostAddress()+":"+ackPacket.getDestinationPort()+", Seq#="+
 				ackPacket.getSequenceNumber()+", Ack#="+ackPacket.getAckNum()+", FIN="+ackPacket.getFIN()+
 				", ACK=1, SYN=0\n");
@@ -292,6 +330,8 @@ public class TCPReceiver {
 	
 	public void close(){
 		while(!endFlag);
+		//cancelDelayACK();
+		ACKDelayTimer.cancel();
 		try {
 			UDPSocket.close();
 			ackSocket.close();
@@ -305,5 +345,26 @@ public class TCPReceiver {
 		
 	}
 	
+	//Task for delay ack.
+	private ACKDelayTask ackDelayTask = new ACKDelayTask();
+	
+	//If timeout, send the ACK.
+	private class ACKDelayTask extends TimerTask{
+		@Override
+		public void run() {
+			sendAck(expectedSequenceNum);
+		}	
+	}
+	
+	private void cancelDelayACK(){
+		ackDelayTask.cancel();
+		delayACK = false;
+	}
+	
+	private void setDelayACK(){
+		delayACK = true;
+		ackDelayTask = new ACKDelayTask();
+		ACKDelayTimer.schedule(ackDelayTask, TCPACKDelayTime);
+	}
 	
 }

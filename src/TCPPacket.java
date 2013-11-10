@@ -123,7 +123,11 @@ public class TCPPacket{
 	//Analyse the packet to get the informations.
 	public boolean analysePacket(){
 		packetHead = new byte[PacketHeadSize];
-		System.arraycopy(packetInByte, 0, packetHead, 0, PacketHeadSize);
+		try{
+			System.arraycopy(packetInByte, 0, packetHead, 0, PacketHeadSize);
+		}catch(ArrayIndexOutOfBoundsException e){
+			return false;
+		}
 		checksum = new byte[2];
 		System.arraycopy(packetHead, 16, checksum, 0, 2);
 		//If the checksum is wrong.

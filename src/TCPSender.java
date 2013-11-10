@@ -262,11 +262,7 @@ public class TCPSender {
 				//Increase the number of retransmitted packets.
 				totalSegmentsRetransmitted++;
 			}
-			
-			
-		}
-		
-		
+		}	
 	}
 	
 	//Task for timer. If time out, the task will be executed.
@@ -321,6 +317,9 @@ public class TCPSender {
 				e.printStackTrace();
 			}
 			
+			//Counter for duplicate ack.
+			int duplicateACKCounter = 0;
+			long ackReceivedBefore = 0;
 			while(true){
 				Long ackReceivedNum = null;
 				try {
@@ -400,17 +399,31 @@ public class TCPSender {
 					}
 				}
 				
-				
-				base = ackReceivedNum + 1;
-				//Delete the packet which is acked.
-				if(!sndPacket.isEmpty()){
-					TCPPacket firstPacket = sndPacket.peek();
-					while(firstPacket.getSequenceNumber()<base){
-						sndPacket.poll();
-						if(sndPacket.isEmpty()) {
-							break;
+				if(ackReceivedNum>=base){
+					base = ackReceivedNum;
+					//Delete the packet which is acked.
+					if(!sndPacket.isEmpty()){
+						TCPPacket firstPacket = sndPacket.peek();
+						while(firstPacket.getSequenceNumber()<base){
+							sndPacket.poll();
+							if(sndPacket.isEmpty()) {
+								break;
+							}
+							firstPacket = sndPacket.peek();
 						}
-						firstPacket = sndPacket.peek();
+					}
+				}else{
+					if(ackReceivedNum==ackReceivedBefore){
+						duplicateACKCounter++;
+						if(duplicateACKCounter==3){
+							duplicateACKCounter = 0;
+							//We should send packet with sequence number ackReceivedNum+1. In fact, it's the base.
+							//The base is the first in sndPacket.
+							udt_send(sndPacket.peek());
+						}
+					}else{
+						ackReceivedBefore = ackReceivedNum;
+						duplicateACKCounter = 0;
 					}
 				}
 				
