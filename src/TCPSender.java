@@ -66,6 +66,9 @@ public class TCPSender {
 	//If output flag == true, then output to stdout.
 	private boolean outputFlag;
 	
+	//If client is disconnected, set flag to true.
+	private boolean urgentStop;
+	
 	public TCPSender(String remoteIP, int remotePort, int ackPort, int windowSize){
 		this.remoteIP = remoteIP;
 		try {
@@ -101,12 +104,14 @@ public class TCPSender {
 		
 		sndPacket = new LinkedBlockingQueue<TCPPacket>();
 		
+		this.urgentStop = false;
+		
 		new ackSocket().start();
 		
 	}
 	
 	//Send
-	public void send(byte[] data){
+	public boolean send(byte[] data){
 		for(int i=0;i<data.length;i=i+(MaxSegmentSize-DefaultHeadLength)){
 			byte[] dataToSend;
 			if(i+MaxSegmentSize-DefaultHeadLength<data.length){
@@ -118,13 +123,17 @@ public class TCPSender {
 			}
 			while(true){
 				//If a segment transmit successfully.
+				if(urgentStop) return false;
 				if(rdt_send(dataToSend)){
 					this.totalSegmentsSent++;
 					break;
 				}
 			}
 		}
-		while(base!=nextSequenceNum);
+		while(base!=nextSequenceNum){
+			if(urgentStop) return false;
+		}
+		return true;
 		
 		
 	}
@@ -224,8 +233,24 @@ public class TCPSender {
 	}
 	
 	public void close(){
+		//If urgent stop
+		if(urgentStop){
+			try {
+				UDPSocket.close();
+				logFileHandle.close();
+			} catch (IOException e) {
+				//e.printStackTrace();
+			} catch (NullPointerException a){
+				
+			}
+			return;
+		}
+		
 		closeFinishFlag = false;
-		while(!sndPacket.isEmpty() ||base != nextSequenceNum);//Wait until all data has been sent.
+		while(!sndPacket.isEmpty() ||base != nextSequenceNum){
+			//Wait until all data has been sent.
+
+		}
 		FINWaitState = 1;
 		rdt_send("FIN");
 
@@ -325,7 +350,19 @@ public class TCPSender {
 				try {
 					byte[] rcvBuf = new byte[576];
 					int rcvLength = in.read(rcvBuf);
-					if(rcvLength==-1) break;
+					if(rcvLength==-1){
+						stopTimer();
+						timer.cancel();
+						urgentStop = true;
+						try {
+							server.close();
+							this.socket.close();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							//e.printStackTrace();
+						}
+						break;
+					}
 					byte[] rcvDataInByte = new byte[rcvLength];
 					System.arraycopy(rcvBuf, 0, rcvDataInByte, 0, rcvLength);
 					TCPPacket ackRcvPacket = new TCPPacket(rcvDataInByte);
@@ -385,7 +422,7 @@ public class TCPSender {
 				Iterator<TCPPacket> it = sndPacket.iterator();
 				while(it.hasNext()){
 					TCPPacket packet =it.next();
-					if(packet.getSequenceNumber()==ackReceivedNum){
+					if(packet.getSequenceNumber()==ackReceivedNum-1){
 						//Only if the transmit times of packet is 1 can we calculate the estimated RTT.
 						if(packet.getTransmitTimes()==1){
 							long sampleRTT = new Date().getTime() - packet.getSendTime();

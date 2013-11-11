@@ -47,6 +47,8 @@ public class sender {
 		
 
 		byte[] packetDataBuf;
+		
+		boolean transmitSuccessFlag = true;
 		try {
 			while(true){
 				packetDataBuf = new byte[556*windowSize*100]; 
@@ -54,7 +56,11 @@ public class sender {
 				if(readCounter==-1) break;
 				byte[] packetData = new byte[readCounter];
 				System.arraycopy(packetDataBuf, 0, packetData, 0, readCounter);
-				fileSender.send(packetData);
+				if(!fileSender.send(packetData)){
+					transmitSuccessFlag = false;
+					break;
+				}
+
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -70,7 +76,8 @@ public class sender {
 		}
 		fileSender.close();
 		
-		System.out.println("Delivery completed successfully.");
+		if(transmitSuccessFlag) System.out.println("Delivery completed successfully.");
+		else System.out.println("Delivery failed.");
 		System.out.println("Total bytes sent = "+fileSender.getTotalBytesSent());
 		System.out.println("Segments sent = "+fileSender.getTotalSegementsSent());
 		System.out.println("Segments retransmitted = "+fileSender.getTotalSegmentsRetransmitted());

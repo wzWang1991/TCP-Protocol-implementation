@@ -75,6 +75,10 @@ public class Server {
 		}else{
 			listenPort = Integer.parseInt(args[0]);
 			System.arraycopy(args, 1, argsForSender, 0, 6);
+			if(!isIPAddress(argsForSender[1])){
+				System.out.println("You should enter a valid IP.");
+				System.exit(-1);
+			}
 		}
 
 		readFile("userpass.ini", userMap);
@@ -595,6 +599,6 @@ public class Server {
 	public static boolean isIPAddress( String str )  
 	{  
 	    Pattern pattern = Pattern.compile( "^((\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5]|[*])\\.){3}(\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5]|[*])$" );  
-	    return pattern.matcher( str ).matches();  
+	    return pattern.matcher(str).matches();  
 	} 
 }

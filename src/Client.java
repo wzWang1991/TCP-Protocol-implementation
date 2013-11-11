@@ -33,6 +33,7 @@ public class Client {
 		
 		System.arraycopy(args, 2, argsForReceiver, 0, 5);
 		
+		
 		//Try to connect to server.
 		Socket socket = null;
 		
