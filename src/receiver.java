@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,6 +28,10 @@ public class receiver {
 		TCPReceiver fileReceiver = new TCPReceiver(remoteIP, remotePort, listeningPort);
 		FileOutputStream out = null;
 		try {
+			if(new File(fileName).exists()){
+				System.out.println("File exists. You should delete it first. Or maybe you set receive file the same name as send file.");
+				return;
+			}
 			out = new FileOutputStream(fileName);
 		} catch (FileNotFoundException e) {
 			System.out.println("Can't create the file with a name "+fileName+" or it can't be opened." );

@@ -32,7 +32,10 @@ public class Client {
 		}
 		
 		System.arraycopy(args, 2, argsForReceiver, 0, 5);
-		
+		if(new File(argsForReceiver[0]).exists()){
+			System.out.println("File exists. You should delete it first. Or maybe you set receive file the same name as the send file.");
+			return;
+		}
 		
 		//Try to connect to server.
 		Socket socket = null;
@@ -120,6 +123,11 @@ public class Client {
 					if(Thread.interrupted()) break;
 					
 					if(readLine.equals("GET") && loginFlag){
+						File tmpFile = new File(argsForReceiver[0]);
+						if(tmpFile.exists()){
+							System.out.println("File exists. You should delete or rename it first. Or maybe you set receive file the same name as the send file.");
+							continue;
+						}
 						dataOut.println(readLine);
 						dataOut.flush();
 						receiver fileReceiver = new receiver(argsForReceiver);
