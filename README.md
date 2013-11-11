@@ -83,7 +83,7 @@ Now here is the new command: GET.
 
 	Get the file from server and save it to disk. You can use proxy between sender and receiver. Before every time using GET, change the parameter of proxy can make the transmission next "GET" experiencing different network environment.
 
-	You should not close the server or client when file is being transmitted.
+	You should not close the server or client when file is being transmitted. If you press ctrl+c on server side when file is transmitting, the client side will automatically exit. If you press ctrl+c on client side, the server side will continue running, and new users can use GET to fetch the file.
 
 	Only one client can use GET at the same time. But after a client finishing receiving file, other client can use GET to fetch file.
 
@@ -122,7 +122,7 @@ Now here is the new command: GET.
 		You can find when it receives 3 duplicate ACK, it will directly send a packet with sequence number equal to duplicate ACK number+1.
 		However, sending a packet will cost some time. So sometimes you will see this packet after 4 or 5 duplicate ACK numbers. It is because when you are sending a packet, new ack arrives and it's shown in log.
 
- - Delayed ACK
+- Delayed ACK
 
  	Page 247 of text book. Wait up to 20ms for arrival of another in-order segment. The default value of timeout is 500ms. But in this case, I set it to 20ms.
  	Test cases:
@@ -134,11 +134,9 @@ Now here is the new command: GET.
 
 ## Implemention Details
 
-- ACK number
-
-	In my program, ack number is closer to TCP protocol but not GBN. When a receiver received a packet, it will send its expected sequence number as its ack number. So the sender should set the base to expected number, but not expected number - 1.
-
 - Calculation of RTT and Timeout
+
+	I have to say, adding delayed ACK and cumulate ACK makes it difficult to estimate the RTT. I haven't found a way to sample RTT, so I just make it as simple one. 
 
 	The default value of estimated RTT and devRTT is 100ms and 25ms.
 
@@ -150,6 +148,9 @@ Now here is the new command: GET.
 
 	If you don't use proxy, the estimated RTT may become 0, which make timeout becomes 0. It's not good to transmit packet with timeout=0. So I set the minimum timeout to 10ms.
 
+- ACK number
+
+	In my program, ack number is closer to TCP protocol but not GBN. When a receiver received a packet, it will send its expected sequence number as its ack number. So the sender should set the base to expected number, but not expected number - 1.
 
 - Head:
 	
