@@ -160,7 +160,7 @@ public class TCPReceiver {
 				}
 				
 				rcvPacketQueue = tmpQueue;
-				sendAck(expectedSequenceNum-1);
+				sendAck(expectedSequenceNum);
 				continue;
 			}
 			
