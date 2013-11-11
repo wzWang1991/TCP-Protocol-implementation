@@ -18,6 +18,10 @@ Java version: 1.7.0_40
 
 ## Server set up and Client connection
 
+You can use test_script to test this program. It will automatically open 3 terminals: proxy, server, and client. After you login, you can type GET to fetch the file. You can change the command in script.
+
+Or you can:
+
 - Start the Server [Sender] as
 	java Server TCP_PORT filename remote_IP remote_port ack_port_number window_size log_filename
 
@@ -27,7 +31,7 @@ Java version: 1.7.0_40
 
 Example:
 	You can set the proxy as
-		./newudpl -i 192.168.36.1/20002 -o 192.168.36.1/20000 -p 5000:6000 -L 50
+		./newudpl -i 192.168.36.1/20002 -o 192.168.36.1/20000 -p 5000:6000 -L 20 -B 10 -O 20
 
 	The proxy is running on 192.168.36.135. And my host computer is 192.168.36.1.
 
@@ -83,7 +87,10 @@ Now here is the new command: GET.
 
 	Get the file from server and save it to disk. You can use proxy between sender and receiver. Before every time using GET, change the parameter of proxy can make the transmission next "GET" experiencing different network environment.
 
-	You should not close the server or client when file is being transmitted. If you press ctrl+c on server side when file is transmitting, the client side will automatically exit. If you press ctrl+c on client side, the server side will continue running, and new users can use GET to fetch the file.
+	You should not close the server or client when file is being transmitted. 
+	If you press ctrl+c on server side when file is transmitting, the client side will automatically exit. 
+	If you press ctrl+c on client side, the sender will stop sending file, and the server will continue running, and new users can use GET to fetch the file. 
+	Note: In my program, the TCP socket only established after receiver receives a packet, so only after it is established, ctrl+c at client side will not affect server.
 
 	Only one client can use GET at the same time. But after a client finishing receiving file, other client can use GET to fetch file.
 
@@ -107,7 +114,7 @@ Now here is the new command: GET.
 	
 	Test case:
 		Transmit a file with proxy. The size of file should not be too small(50-100KB is fine).
-		You may choose a good window size, which should not be too small(Larger than 10 is good). 
+		You may choose a proper window size, which should not be too small(Larger than 10 is good). 
 		Set the proxy with -O 50 or -L 50. Maybe setting the out of order rate could shows it better.
 		Transmit the file, and check the log file of receiver.
 		You can see that the ACK number will changed but it does not increase by one if it has buffers some packets and just received a packet it lacks.
@@ -122,9 +129,9 @@ Now here is the new command: GET.
 		You can find when it receives 3 duplicate ACK, it will directly send a packet with sequence number equal to duplicate ACK number+1.
 		However, sending a packet will cost some time. So sometimes you will see this packet after 4 or 5 duplicate ACK numbers. It is because when you are sending a packet, new ack arrives and it's shown in log.
 
-- Delayed ACK
+- Delayed ACK(RFC 5681)
 
- 	Page 247 of text book. Wait up to 20ms for arrival of another in-order segment. The default value of timeout is 500ms. But in this case, I set it to 20ms.
+ 	Page 247 of text book. Wait up to 20ms for arrival of another in-order segment. The default value of timeout is 500ms. But in this case, I set it to 10ms.
  	Test cases:
  		You should choose a proper window size(10 is fine).
  		You can transmit a big file and observe the log of receiver.
@@ -148,9 +155,17 @@ Now here is the new command: GET.
 
 	If you don't use proxy, the estimated RTT may become 0, which make timeout becomes 0. It's not good to transmit packet with timeout=0. So I set the minimum timeout to 10ms.
 
+	Like TCP, only calculate the packet which did not be resent.
+
 - ACK number
 
 	In my program, ack number is closer to TCP protocol but not GBN. When a receiver received a packet, it will send its expected sequence number as its ack number. So the sender should set the base to expected number, but not expected number - 1.
+
+- ACK strategy
+
+	In GBN, receiver should not send an ack for a packet whose sequence number is smaller than expected number. I found some times, although ack is transmitted on TCP, especially when transmitting rate is very high, an ack may not be processed correctly at sender side. In this case, if window size is 1, the transmitting process may stop. Because sender can't receive any ack for its packet.
+
+	So I make receiver send an proper ack, which ack number is expected number, for any packet, including corrupt packet, except delayed ACK happens.
 
 - Head:
 	
@@ -159,11 +174,7 @@ Now here is the new command: GET.
 - FIN:
 
 	FIN packet is transmited after the end of file transmission. Sender will send a FIN to receiver. When receiver received a FIN, it will send an ack of it. After 10ms, it will send a FIN packet to sender. When sender receive this packet, it will send a ack to this packet.After that, the socket will be closed.
-
-- Estimated RTT
 	
-	Like TCP, only calculate the packet which did not be resent.
-
 - Ending output information on sender
 
 	Total bytes sent: Calculate size of all packets, including FIN packet.

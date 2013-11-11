@@ -32,10 +32,10 @@ public class Client {
 		}
 		
 		System.arraycopy(args, 2, argsForReceiver, 0, 5);
-		if(new File(argsForReceiver[0]).exists()){
-			System.out.println("File exists. You should delete it first. Or maybe you set receive file the same name as the send file.");
-			return;
-		}
+//		if(new File(argsForReceiver[0]).exists()){
+//			System.out.println("File exists. You should delete it first. Or maybe you set receive file the same name as the send file.");
+//			return;
+//		}
 		
 		//Try to connect to server.
 		Socket socket = null;
