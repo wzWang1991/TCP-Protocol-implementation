@@ -425,7 +425,7 @@ public class TCPSender {
 					if(packet.getSequenceNumber()==ackReceivedNum-1){
 						//Only if the transmit times of packet is 1 can we calculate the estimated RTT.
 						if(packet.getTransmitTimes()==1){
-							long sampleRTT = new Date().getTime() - packet.getSendTime();
+							long sampleRTT = System.currentTimeMillis() - packet.getSendTime();
 							estimatedRTT = (1-RTTalpha) * estimatedRTT + RTTalpha * sampleRTT;
 							double diffRTT = sampleRTT - estimatedRTT;
 							if(diffRTT<0) diffRTT = -diffRTT;

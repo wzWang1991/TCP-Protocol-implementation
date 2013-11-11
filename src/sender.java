@@ -41,7 +41,7 @@ public class sender {
 	        dis=new DataInputStream(in); 
 		} catch (FileNotFoundException e) {
 			System.out.println("Can't find the file with name "+fileName);
-			
+			System.exit(-1);
 			//e.printStackTrace();
 		}
 		

@@ -30,6 +30,7 @@ public class receiver {
 			out = new FileOutputStream(fileName);
 		} catch (FileNotFoundException e) {
 			System.out.println("Can't create the file with a name "+fileName+" or it can't be opened." );
+			System.exit(-1);
 			//e.printStackTrace();
 		}  
         

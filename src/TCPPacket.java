@@ -358,7 +358,7 @@ public class TCPPacket{
 	}
 	
 	public void setSendTime(){
-		sendTime = new Date().getTime();
+		sendTime = System.currentTimeMillis();
 	}
 	
 	public long getSendTime(){
