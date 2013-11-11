@@ -20,7 +20,7 @@ public class TCPReceiver {
 	
 	//Delayed ACK. Wait up to 10 msec for arrival of another in-order segment. 
 	//If next in-order segment does not arrive in this interval, send an ACK.
-	private final int TCPACKDelayTime = 20;
+	private final int TCPACKDelayTime = 10;
 	
 	private String remoteIP;
 	private int remotePort;
@@ -239,6 +239,9 @@ public class TCPReceiver {
 				}
 				TCPPacket FINPacket = new TCPPacket(listeningPort,remotePort,0,0,"FIN",null, windowSize);
 				sendMessage(FINPacket.generatePacket());
+				writeLog("Src=localhost:"+ackSocket.getLocalPort()+", Des="+ackSocket.getInetAddress().getHostAddress()+":"+ackSocket.getPort()+", Seq#="+
+						FINPacket.getSequenceNumber()+", Ack#="+FINPacket.getAckNum()+", FIN="+FINPacket.getFIN()+
+						", ACK=0, SYN=0\n");
 				endFlag = true;
 				return null;
 			}		
@@ -266,7 +269,7 @@ public class TCPReceiver {
 		if(ackNum<0) newAckNum = 0;
 		else newAckNum = ackNum;
 		TCPPacket ackPacket = new TCPPacket(listeningPort,remotePort,0,newAckNum,"ACK",null, windowSize);
-		writeLog("Src=localhost:"+ackPacket.getSourcePort()+", Des="+ackSocket.getInetAddress().getHostAddress()+":"+ackPacket.getDestinationPort()+", Seq#="+
+		writeLog("Src=localhost:"+ackSocket.getLocalPort()+", Des="+ackSocket.getInetAddress().getHostAddress()+":"+ackPacket.getDestinationPort()+", Seq#="+
 				ackPacket.getSequenceNumber()+", Ack#="+ackPacket.getAckNum()+", FIN="+ackPacket.getFIN()+
 				", ACK=1, SYN=0\n");
 		byte[] ackToSend = ackPacket.generatePacket();

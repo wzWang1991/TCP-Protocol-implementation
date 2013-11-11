@@ -253,6 +253,7 @@ public class TCPSender {
 		}
 		FINWaitState = 1;
 		rdt_send("FIN");
+		this.totalSegmentsSent++;
 
 		while(!closeFinishFlag);
 		try {
@@ -303,7 +304,6 @@ public class TCPSender {
 		try{
 			pktTask.cancel();
 			pktTask = new PacketTimerTask();
-			
 			timer.schedule(pktTask, timeOutForTCP);
 		}catch(java.lang.IllegalStateException e){
 			//e.printStackTrace();
