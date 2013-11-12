@@ -133,10 +133,12 @@ public class TCPReceiver {
 				
 				LinkedBlockingQueue<TCPPacket> tmpQueue = new LinkedBlockingQueue<TCPPacket>();
 				boolean insertedFlag =false;
+				
 				if(!rcvPacketQueue.isEmpty()){
 					Iterator<TCPPacket> it = rcvPacketQueue.iterator();
+					TCPPacket packetTmp = null;
 					while(it.hasNext()){
-						TCPPacket packetTmp =it.next();
+						packetTmp = it.next();
 						if(packetTmp.getSequenceNumber()<rcvPacket.getSequenceNumber()) tmpQueue.add(packetTmp);
 						else if(packetTmp.getSequenceNumber()>rcvPacket.getSequenceNumber()){
 							//If we don't insert the packet we already received.
@@ -144,7 +146,7 @@ public class TCPReceiver {
 								tmpQueue.add(rcvPacket);
 								tmpQueue.add(packetTmp);
 								insertedFlag = true;
-							}else{
+							}else{	
 								tmpQueue.add(packetTmp);
 							}
 						}else{
@@ -152,11 +154,18 @@ public class TCPReceiver {
 							//Do nothing.
 						}
 					}
+					//We know packetTmp is the last one of that queue.
+					//It may lead to a gap.So we test it whether a new gap is created.
+					if(packetTmp.getSequenceNumber()+1<rcvPacket.getSequenceNumber()){
+						//If gap detected, send duplicate ACK. So we need to send an additional one in this.
+						sendAck(expectedSequenceNum);
+					}
 				}
 				//If the packet is still not inserted, insert it at the end of queue.
 				if(!insertedFlag){
 					tmpQueue.add(rcvPacket);
 					insertedFlag = true;
+					
 				}
 				
 				rcvPacketQueue = tmpQueue;
@@ -178,14 +187,18 @@ public class TCPReceiver {
 						if(!delayACK) setDelayACK();
 						else{
 							cancelDelayACK();
-							setDelayACK();
+							//sendAck(expectedSequenceNum);
 						}
 					}else{
-						sendAck(expectedSequenceNum);
+						cancelDelayACK();
+						//Received a FIN packet, just send ack at below.
+						//sendAck(expectedSequenceNum);
 					}
 					//else sendAck(expectedSequenceNum);
 					data = rcvPacket.getDataInByte();
 					expectedSequenceNum++;
+					//If ACK is not delayed, send ACK.
+					if(!delayACK) sendAck(expectedSequenceNum);
 				}else{
 					if(delayACK) cancelDelayACK();
 					//Counter for how many bytes should be returned.
