@@ -123,27 +123,35 @@ Now here is the new command: GET.
 
 	Test case:
 		Transmit a file with proxy. The size of file should not be too small(50-100KB is fine).
-		Set a proper window size.
+		Set a proper window size(10 is fine). 
 		Set the proxy with -L 50.
 		Transmit the file, and check the log on sender.
-		You can find when it receives 3 duplicate ACK, it will directly send a packet with sequence number equal to duplicate ACK number+1.
-		However, sending a packet will cost some time. So sometimes you will see this packet after 4 or 5 duplicate ACK numbers. It is because when you are sending a packet, new ack arrives and it's shown in log.
+		You can find when it receives 3 duplicate ACK, it will directly send a packet with sequence number equal to duplicate ACK number.
 
-- Delayed ACK(RFC 5681)
+- Implementation of TCP ACK Generation Recommendation(RFC 5681)
 
- 	Page 247 of text book. Wait up to 20ms for arrival of another in-order segment. The default value of timeout is 500ms. But in this case, I set it to 10ms.
- 	Test cases:
- 		You should choose a proper window size(10 is fine).
- 		You can transmit a big file and observe the log of receiver.
- 		You can find that the receiver will not send an ACK for the arrival of in-order segment with expected sequence number. It will only send an ACK when it doesn't receive another in-order segment in 20ms or when other cases(on page 247) happen. 
+	- Delayed ACK(Only when window size>1)
+
+ 		Wait up to 20ms for arrival of another in-order segment. The default value of timeout is 500ms. But in this case, I set it to 10ms.
+	 	Test case:
+	 		You should choose a proper window size(10 is fine). 
+	 		You can set loss rate, out-of-order rate, bit-error rate to zero in this case.
+	 		You can transmit a big file and observe the log of receiver.
+	 		You will find that the receiver will not send an ACK for the arrival of in-order segment with expected sequence number. It will send an ACK when it receives another in-order packet and there may be duplicate ACK depends on what packet sequence number it received.
+
+	- Duplicate ACK
+		Arrival of out-of-order segment with higher-than-expected sequence leads to sending send duplicate ACK immediately, indicating sequence number of next number. 
+		Test case:
+			You should choose a proper window size(10 is fine). 
+	 		Set the proxy with -L 20 -O 20.
+	 		You can transmit a big file and observe the log of receiver.
+	 		When receiver receives a packet with a sequence number which makes a gap in its buffer, it will send duplicate ACK. For example, if receiver is expecting sequence number 2, and its buffer includes packet with sequence number 3,4, when it receives a packet with sequence number 6, there is a gap in the buffer. So at this time, it will send duplicate ACK to sender.
 
 -------------------------------------------------------------------------
 
 ## Implemention Details
 
 - Calculation of RTT and Timeout
-
-	I have to say, adding delayed ACK and cumulate ACK makes it difficult to estimate the RTT. I haven't found a way to sample RTT, so I just make it as simple one. 
 
 	The default value of estimated RTT and devRTT is 100ms and 25ms.
 
@@ -169,7 +177,7 @@ Now here is the new command: GET.
 
 - Head:
 	
-	Alough the window size is used for solving congestion, I used it here to transmit the window size from sender to receiver. By doing this, we don't need to pass a window size parameter to receiver to implement accumulate ACK.
+	Alough the window size is used for solving congestion, I used it here to transmit the window size from sender to receiver. By doing this, we don't need to pass a window size parameter to receiver to implement buffer packet.
 
 - FIN:
 
@@ -180,6 +188,14 @@ Now here is the new command: GET.
 	Total bytes sent: Calculate size of all packets, including FIN packet.
 	Segment sent: Calculate how many packets should be sent, including FIN packet.
 	Segments retransmitted: Calculate how many packets were retransmited, including FIN packet. If we transmit a packet 3 times before we received a ACK, it will be counted as 2 times retransmission.
+
+- File receiving and writing
+	
+	The receiver will verify if there is a file with a name which it want to use as its receive file name. So you may need to delete the file if there exists.
+
+- Establish of TCP connection
+
+	Only when receiver receives first packet from sender will it try to connect to sender.
 
 - Excpetion of proxy
 
