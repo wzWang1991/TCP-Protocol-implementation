@@ -20,7 +20,7 @@ public class TCPReceiver {
 	
 	//Delayed ACK. Wait up to 10 msec for arrival of another in-order segment. 
 	//If next in-order segment does not arrive in this interval, send an ACK.
-	private final int TCPACKDelayTime = 10;
+	private int TCPACKDelayTime = 10;
 	
 	private String remoteIP;
 	private int remotePort;
@@ -107,6 +107,8 @@ public class TCPReceiver {
 			//When windowSize is not set, use windowSize in the packet to set the windowSize.
 			if(windowSize==0){
 				this.windowSize = rcvPacket.getWindowSize();
+				//If window size is 1, we don't want to use delayed ack.
+				if(this.windowSize==1) TCPACKDelayTime=1;
 				//Initialized the buffer for rcvPacket.
 				rcvPacketQueue = new LinkedBlockingQueue<TCPPacket>();
 			}

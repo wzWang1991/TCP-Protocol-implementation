@@ -42,9 +42,9 @@ public class TCPSender {
 	
 	private Timer timer;
 	
-	private double estimatedRTT;
-	private double devRTT;
-	private long timeOutForTCP;
+	private volatile double estimatedRTT;
+	private volatile double devRTT;
+	private volatile long timeOutForTCP;
 	
 	private long totalBytesSent;
 	private int totalSegmentsSent;
@@ -436,7 +436,7 @@ public class TCPSender {
 					}
 				}
 				
-				if(ackReceivedNum>=base){
+				if(ackReceivedNum>base){
 					base = ackReceivedNum;
 					//Delete the packet which is acked.
 					if(!sndPacket.isEmpty()){
@@ -449,6 +449,9 @@ public class TCPSender {
 							firstPacket = sndPacket.peek();
 						}
 					}
+					ackReceivedBefore = ackReceivedNum;
+					//At this time, counter is 1. Because we receive a new ackNum.
+					duplicateACKCounter = 1;
 				}else{
 					if(ackReceivedNum==ackReceivedBefore){
 						duplicateACKCounter++;
@@ -460,7 +463,7 @@ public class TCPSender {
 						}
 					}else{
 						ackReceivedBefore = ackReceivedNum;
-						duplicateACKCounter = 0;
+						duplicateACKCounter = 1;
 					}
 				}
 				
