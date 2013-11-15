@@ -459,7 +459,7 @@ public class TCPSender {
 							duplicateACKCounter = 0;
 							//We should send packet with sequence number ackReceivedNum+1. In fact, it's the base.
 							//The base is the first in sndPacket.
-							udt_send(sndPacket.peek());
+							if(!sndPacket.isEmpty()) udt_send(sndPacket.peek());
 						}
 					}else{
 						ackReceivedBefore = ackReceivedNum;

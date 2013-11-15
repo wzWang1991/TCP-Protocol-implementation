@@ -159,7 +159,7 @@ public class TCPReceiver {
 					//We know packetTmp is the last one of that queue.
 					//It may lead to a gap.So we test it whether a new gap is created.
 					if(packetTmp.getSequenceNumber()+1<rcvPacket.getSequenceNumber()){
-						//If gap detected, send duplicate ACK. So we need to send an additional one in this.
+						//If gap detected, send duplicate ACK. So we need to send an additional one here.
 						sendAck(expectedSequenceNum);
 					}
 				}
