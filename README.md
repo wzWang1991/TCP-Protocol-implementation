@@ -117,7 +117,7 @@ Now here is the new command: GET.
 		You may choose a proper window size, which should not be too small(Larger than 10 is good). 
 		Set the proxy with -O 50 or -L 50. Maybe setting the out of order rate could shows it better.
 		Transmit the file, and check the log file of receiver.
-		You can see that the ACK number will changed but it does not increase by one if it has buffers some packets and just received a packet it lacks.
+		You can see that the ACK number of adjacent packet will changed but it does not increase by one if it has buffers some packets and just received a packet it lacks.
 
 - Fast retransmission on sender.
 
@@ -125,27 +125,31 @@ Now here is the new command: GET.
 		Transmit a file with proxy. The size of file should not be too small(50-100KB is fine).
 		Set a proper window size(10 is fine). 
 		Set the proxy with -L 50.
-		Transmit the file, and check the log on sender.
-		You can find when it receives 3 duplicate ACK, it will directly send a packet with sequence number equal to duplicate ACK number.
+		Transmit the file, and check the log file of sender.
+		You can find when it receives 3 duplicate ACK, it will immediately send a packet with sequence number equal to duplicate ACK number.
 
 - Implementation of TCP ACK Generation Recommendation(RFC 5681)
 
 	- Delayed ACK(Only when window size>1)
 
  		Wait up to 20ms for arrival of another in-order segment. The default value of timeout is 500ms. But in this case, I set it to 10ms.
+
 	 	Test case:
 	 		You should choose a proper window size(10 is fine). 
 	 		You can set loss rate, out-of-order rate, bit-error rate to zero in this case.
-	 		You can transmit a big file and observe the log of receiver.
-	 		You will find that the receiver will not send an ACK for the arrival of in-order segment with expected sequence number. It will send an ACK when it receives another in-order packet and there may be duplicate ACK depends on what packet sequence number it received.
+	 		You can transmit a big file and check the log of receiver.
+	 		You will find that the receiver will not send an ACK for the arrival of in-order segment with expected sequence number. It will send an ACK when it receives another in-order packet.
 
 	- Duplicate ACK
+
 		Arrival of out-of-order segment with higher-than-expected sequence leads to sending send duplicate ACK immediately, indicating sequence number of next number. 
+
 		Test case:
 			You should choose a proper window size(10 is fine). 
 	 		Set the proxy with -L 20 -O 20.
-	 		You can transmit a big file and observe the log of receiver.
-	 		When receiver receives a packet with a sequence number which makes a gap in its buffer, it will send duplicate ACK. For example, if receiver is expecting sequence number 2, and its buffer includes packet with sequence number 3,4, when it receives a packet with sequence number 6, there is a gap in the buffer. So at this time, it will send duplicate ACK to sender.
+	 		You can transmit a big file and check the log of receiver. There will be two lines transmitting duplicate ACK nearly at the same time.
+	 		When receiver receives a packet with a sequence number which makes a gap in its buffer, it will send duplicate ACK. 
+	 		For example, if receiver is expecting sequence number 2, and its buffer includes packet with sequence number 3,4, when it receives a packet with sequence number 6, there is a gap in the buffer. So at this time, it will send duplicate ACK to sender.
 
 -------------------------------------------------------------------------
 
@@ -165,13 +169,17 @@ Now here is the new command: GET.
 
 	Like TCP, only calculate the packet which did not be resent.
 
-- ACK number
+- ACK 
+	
+	- The receiver sends ACK packet with 20-bytes length head.
 
-	In my program, ack number is closer to TCP protocol but not GBN. When a receiver received a packet, it will send its expected sequence number as its ack number. So the sender should set the base to expected number, but not expected number - 1.
+	- ACK number
 
-- ACK strategy
+		In my program, ack number is closer to TCP protocol but not GBN. When a receiver received a packet, it will send its expected sequence number as its ack number. So the sender should set the base to expected number, but not expected number - 1.
 
-	In GBN, receiver should not send an ack for a packet whose sequence number is smaller than expected number. I found some times, although ack is transmitted on TCP, especially when transmitting rate is very high, an ack may not be processed correctly at sender side. In this case, if window size is 1, the transmitting process may stop. Because sender can't receive any ack for its packet.
+	- ACK strategy
+
+		In GBN, receiver should not send an ack for a packet whose sequence number is smaller than expected number. I found some times, although ack is transmitted on TCP, especially when transmitting rate is very high, an ack may not be processed correctly at sender side. In this case, if window size is 1, the transmitting process may stop. Because sender can't receive any ack for its packet.
 
 	So I make receiver send an proper ack, which ack number is expected number, for any packet, including corrupt packet, except delayed ACK happens.
 
@@ -179,7 +187,7 @@ Now here is the new command: GET.
 	
 	Alough the window size is used for solving congestion, I used it here to transmit the window size from sender to receiver. By doing this, we don't need to pass a window size parameter to receiver to implement buffer packet.
 
-- FIN:
+- FIN packet:
 
 	FIN packet is transmited after the end of file transmission. Sender will send a FIN to receiver. When receiver received a FIN, it will send an ack of it. After 10ms, it will send a FIN packet to sender. When sender receive this packet, it will send a ack to this packet.After that, the socket will be closed.
 	
@@ -200,3 +208,9 @@ Now here is the new command: GET.
 - Excpetion of proxy
 
 	If you transmit a lot of packets through proxy in a short time, there may be an Floating point exception (core dumped). At that time, you can restart it and the transmission will continue.
+
+-------------------------------------------------------------------------
+
+## Bugs I can't solve
+
+- When loss rate is high, file size is large, and you choose to output log to stdout, sometimes sender can't receive any ACK packet from receiver. I use wireshark trying to find this problem. But I found that receiver did send the ACK packet using TCP. And the socket in sender does not throw any exception. But it blocked at in.read(rcvBuf). So sender can not get any ACK when this case happens. 
